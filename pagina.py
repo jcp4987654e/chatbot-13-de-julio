@@ -36,44 +36,56 @@ def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
         return None
 
 def buscar_contexto_relevante(query, base_de_conocimiento):
-    """Busca palabras clave en la consulta para encontrar información relevante."""
+    """
+    Busca palabras clave en la consulta para encontrar TODA la información relevante.
+    Ahora puede recopilar múltiples contextos.
+    """
     if base_de_conocimiento is None:
         return "Error: la base de conocimientos no está disponible."
+    
     query_lower = query.lower()
     contexto_encontrado = ""
-    # Busca en la información general
+    temas_ya_anadidos = set() # Para evitar duplicar la misma información
+
+    # Itera sobre toda la base de conocimientos
     for topic, data in base_de_conocimiento.items():
+        if topic == "material_academico": continue # Se maneja en el siguiente bucle
+        
         if isinstance(data, dict) and 'keywords' in data:
             for keyword in data.get("keywords", []):
-                if keyword in query_lower:
+                if keyword in query_lower and topic not in temas_ya_anadidos:
                     contexto_encontrado += f"- {data.get('content', '')}\n"
-                    break # Evita añadir la misma info varias veces
-    # Busca en el material académico
+                    temas_ya_anadidos.add(topic)
+                    break # Sale del bucle de keywords para este tema y pasa al siguiente
+
+    # Busca específicamente en el material académico
     if "material_academico" in base_de_conocimiento:
         for year, subjects in base_de_conocimiento["material_academico"].items():
             for subject_name, subject_data in subjects.items():
-                 for keyword in subject_data.get("keywords", []):
+                subject_id = f"{year}-{subject_name}" # ID único para cada materia
+                if subject_id in temas_ya_anadidos: continue
+
+                for keyword in subject_data.get("keywords", []):
                     if keyword in query_lower:
-                        # Formatea una respuesta bonita para el material académico
-                        info = f"**{subject_data.get('content', subject_name.replace('_', ' ').title())}**\n"
+                        info = f"\n**{subject_data.get('content', subject_name.replace('_', ' ').title())}**\n"
                         info += f"Profesor: {subject_data.get('profesor', 'No asignado')}\n"
-                        # Añade información de evaluaciones si existe
                         if subject_data.get('evaluaciones'):
                             info += "**Próximas Evaluaciones:**\n"
                             for eval in subject_data['evaluaciones']:
                                 info += f"  - Fecha: {eval['fecha']}, Temas: {eval['temas']}\n"
-                        # Añade información de temas si existe
                         if subject_data.get('temas'):
                              info += "**Temas y Apuntes:**\n"
                              for tema in subject_data['temas']:
                                  info += f"  - [{tema['nombre']}]({tema['apuntes']})\n"
-                        contexto_encontrado += info + "\n"
-                        break
-
+                        contexto_encontrado += info
+                        temas_ya_anadidos.add(subject_id)
+                        break # Sale del bucle de keywords para esta materia y pasa a la siguiente
 
     if not contexto_encontrado:
         return base_de_conocimiento.get("info_general", {}).get("content", "No se encontró contexto específico.")
+    
     return contexto_encontrado
+
 
 def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
     """Envía la petición a la API de Groq."""
@@ -93,7 +105,7 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- Estilos CSS Embebidos para Máxima Compatibilidad ---
-    LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
         /* --- Definición de Animaciones --- */
@@ -248,5 +260,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
