@@ -10,7 +10,7 @@ import time
 st.set_page_config(
     page_title="Chatbot del Instituto 13 de Julio",
     page_icon="🎓",
-    layout="centered"
+    layout="wide" # Usamos layout "wide" para un mejor control del centrado
 )
 
 # --- CONSTANTES Y CONFIGURACIÓN INICIAL ---
@@ -137,7 +137,7 @@ def generar_respuesta_stream(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- Estilos CSS Embebidos con Diseño Responsivo ---
-    LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
         /* --- Definición de Animaciones --- */
@@ -147,77 +147,63 @@ def main():
             100% {{ box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4; }}
         }}
         @keyframes fadeIn {{
-            from {{ opacity: 0; transform: translateY(20px); }}
+            from {{ opacity: 0; transform: translateY(10px); }}
             to {{ opacity: 1; transform: translateY(0); }}
         }}
-        @keyframes fadeOut {{
-            from {{ opacity: 1; }}
-            to {{ opacity: 0; }}
+        @keyframes thinking-dots {{
+            0%, 100% {{ opacity: 0.2; }}
+            50% {{ opacity: 1; }}
         }}
 
-        /* --- Estilos Splash Screen --- */
-        .splash-container {{
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 90vh; /* Ocupa toda la pantalla verticalmente */
-            animation: fadeIn 1s ease-in-out;
-        }}
-        .splash-logo {{
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            margin-bottom: 2rem;
-            animation: pulse 3s infinite;
-        }}
-        .splash-title {{
-            font-size: 2.5rem;
-            color: #e6e6fa;
-            text-shadow: 0 0 10px rgba(161, 201, 244, 0.7);
-            margin-bottom: 2rem;
-        }}
-
-        /* --- Estilos App Principal --- */
-        .app-container {{
-            animation: fadeIn 0.8s ease-in-out;
-        }}
-        [data-testid="stAppViewContainer"] > .main {{
+        /* --- Estilos Generales y de Fondo --- */
+        .stApp {{
             background-color: #2d2a4c;
             background-image: 
                 repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 20px),
                 repeating-linear-gradient(-45deg, rgba(161, 201, 244, 0.05), rgba(161, 201, 244, 0.05) 1px, transparent 1px, transparent 20px),
                 linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
         }}
+
+        /* --- Estilos Splash Screen --- */
+        .splash-container {{
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 9999; animation: fadeIn 1s ease-in-out;
+        }}
+        .splash-logo {{
+            width: 180px; height: 180px; border-radius: 50%;
+            margin-bottom: 2rem; animation: pulse 3s infinite;
+        }}
+        .splash-title {{
+            font-size: 2.5rem; color: #e6e6fa; text-shadow: 0 0 10px rgba(161, 201, 244, 0.7);
+        }}
+
+        /* --- Estilos App Principal --- */
+        .main-container {{
+            animation: fadeIn 0.5s ease-in-out;
+            max-width: 900px; margin: auto;
+        }}
         [data-testid="stSidebar"] {{
-            border-right: 2px solid #a1c9f4;
-            background-color: #2d2a4c;
+            border-right: 2px solid #a1c9f4; background-color: #2d2a4c;
         }}
         .sidebar-logo {{
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: 3px solid #a1c9f4;
-            display: block;
-            margin: 2rem auto;
+            width: 120px; height: 120px; border-radius: 50%; border: 3px solid #a1c9f4;
+            display: block; margin: 2rem auto;
             animation: pulse 4s infinite ease-in-out;
         }}
         h1 {{
-            color: #e6e6fa;
-            text-shadow: 0 0 8px rgba(161, 201, 244, 0.7);
-            text-align: center;
-            padding-top: 2rem;
+            color: #e6e6fa; text-shadow: 0 0 8px rgba(161, 201, 244, 0.7);
+            text-align: center; padding-top: 1rem;
         }}
         .chat-wrapper {{
-            border: 2px solid #4f4a7d;
-            box-shadow: 0 0 20px -5px #a1c9f4;
-            border-radius: 20px;
-            background-color: rgba(45, 42, 76, 0.8);
-            padding: 1rem;
-            margin-top: 1rem;
+            border: 2px solid #4f4a7d; box-shadow: 0 0 20px -5px #a1c9f4;
+            border-radius: 20px; background-color: rgba(45, 42, 76, 0.8);
+            padding: 1rem; margin-top: 1rem;
         }}
+        /* Animación de entrada de mensajes sutil */
         [data-testid="stChatMessage"] {{
-            border-radius: 15px; padding: 1rem; margin-bottom: 1rem;
+            animation: fadeIn 0.3s ease-out;
         }}
         [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{
             background-color: #4f4a7d; border: 1px solid #a1c9f4;
@@ -228,11 +214,16 @@ def main():
         [data-testid="stChatInput"] {{
             background-color: transparent; border-top: 2px solid #a1c9f4; padding-top: 1rem;
         }}
+        .thinking-indicator {{
+            font-style: italic; color: rgba(230, 230, 250, 0.7);
+            animation: thinking-dots 1.5s infinite;
+        }}
         
-        /* --- Diseño Responsivo --- */
+        /* --- Diseño Responsivo para Celulares --- */
         @media (max-width: 768px) {{
+            .main-container {{ padding-left: 0.5rem !important; padding-right: 0.5rem !important; }}
             .splash-logo {{ width: 120px; height: 120px; }}
-            .splash-title {{ font-size: 1.8rem; }}
+            .splash-title {{ font-size: 1.8rem; text-align: center;}}
             .chat-wrapper {{ margin-top: 0.5rem; padding: 0.5rem; }}
             h1 {{ font-size: 1.8rem; padding-top: 1rem; }}
             .sidebar-logo {{ width: 80px; height: 80px; }}
@@ -240,17 +231,14 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # --- Lógica de Splash Screen vs App Principal ---
+    # --- Lógica de Carga Inicial y Splash Screen ---
     if 'app_ready' not in st.session_state:
-        # Mostrar Splash Screen y cargar todo en segundo plano
+        st.session_state.app_ready = False
+
+    if not st.session_state.app_ready:
         splash_placeholder = st.empty()
         with splash_placeholder.container():
-            st.markdown(f"""
-                <div class="splash-container">
-                    <img src="{LOGO_URL}" class="splash-logo">
-                    <h1 class="splash-title">Bienvenido a TecnoBot</h1>
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f'<div class="splash-container"><img src="{LOGO_URL}" class="splash-logo"><h1 class="splash-title">Bienvenido a TecnoBot</h1></div>', unsafe_allow_html=True)
         
         # Carga pesada de modelos
         st.session_state.base_de_conocimiento = cargar_base_de_conocimiento()
@@ -258,15 +246,13 @@ def main():
         st.session_state.modelo_embeddings = cargar_modelo_embeddings()
         st.session_state.indice_embeddings = crear_indice_semantico(st.session_state.documentos_planos, st.session_state.modelo_embeddings)
         
-        # Espera de 3 segundos
         time.sleep(3)
         st.session_state.app_ready = True
-        splash_placeholder.empty() # Limpiar la splash screen
+        splash_placeholder.empty()
         st.rerun()
 
+    # --- APP PRINCIPAL DEL CHATBOT ---
     else:
-        # --- APP PRINCIPAL DEL CHATBOT ---
-        # Recuperar datos cargados desde el session_state
         base_de_conocimiento = st.session_state.base_de_conocimiento
         documentos_planos = st.session_state.documentos_planos
         modelo_embeddings = st.session_state.modelo_embeddings
@@ -275,6 +261,8 @@ def main():
         if indice_embeddings is None:
             st.error("Hubo un problema al inicializar el motor de conocimiento. Por favor, recarga la página.")
             st.stop()
+        
+        st.markdown('<div class="main-container">', unsafe_allow_html=True)
         
         with st.sidebar:
             st.markdown(f'<img src="{LOGO_URL}" class="sidebar-logo">', unsafe_allow_html=True)
@@ -292,9 +280,13 @@ def main():
         if "mensajes" not in st.session_state:
             st.session_state.mensajes = [{"role": "assistant", "content": "¡Hola! Soy TecnoBot. ¿En qué puedo ayudarte?"}]
 
-        for mensaje in st.session_state.mensajes:
-            with st.chat_message(mensaje["role"], avatar="🤖" if mensaje["role"] == "assistant" else "🧑‍💻"):
-                st.markdown(mensaje["content"], unsafe_allow_html=True)
+        st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
+        chat_container = st.container(height=500)
+        with chat_container:
+            for mensaje in st.session_state.mensajes:
+                with st.chat_message(mensaje["role"], avatar="🤖" if mensaje["role"] == "assistant" else "🧑‍💻"):
+                    st.markdown(mensaje["content"], unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
         if prompt_usuario := st.chat_input("Escribe tu pregunta aquí..."):
             st.session_state.mensajes.append({"role": "user", "content": prompt_usuario})
@@ -302,10 +294,9 @@ def main():
                 st.markdown(prompt_usuario)
 
             with st.chat_message("assistant", avatar="🤖"):
-                thinking_placeholder = st.empty()
-                thinking_placeholder.markdown("Tirando magia... ✨")
-                start_time = time.time() # Registrar tiempo de inicio
-
+                placeholder = st.empty()
+                placeholder.markdown('<p class="thinking-indicator">Tirando magia...</p>', unsafe_allow_html=True)
+                
                 contexto_rag = buscar_contexto_semantico(prompt_usuario, modelo_embeddings, documentos_planos, indice_embeddings)
                 system_prompt_con_contexto = f"{SYSTEM_PROMPT}\n\nCONTEXTO RELEVANTE:\n{contexto_rag}"
                 
@@ -315,15 +306,13 @@ def main():
                 
                 response_stream = generar_respuesta_stream(cliente_groq, modelo_seleccionado, historial_para_api)
                 
-                # Asegurar que el mensaje de "pensando" se muestre mínimo 2s
-                duration = time.time() - start_time
-                if duration < 2:
-                    time.sleep(2 - duration)
-
-                full_response = thinking_placeholder.write_stream(response_stream)
+                # Usar el placeholder para escribir la respuesta, reemplazando el indicador
+                full_response = placeholder.write_stream(response_stream)
             
             st.session_state.mensajes.append({"role": "assistant", "content": full_response})
             st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
