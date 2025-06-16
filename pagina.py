@@ -137,7 +137,7 @@ def generar_respuesta_stream(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- Estilos CSS Embebidos con Diseño Responsivo ---
-    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    LOGO_URL = "https://www.google.com/url?sa=i&url=https%3A%2F%2F13dejulio.edu.ar%2F&psig=AOvVaw2cmkyuYKKdsbKR__vUyYkb&ust=1750195692044000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCIDV-5jx9o0DFQAAAAAdAAAAABAE" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
         /* --- Definición de Animaciones --- */
