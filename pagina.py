@@ -23,14 +23,6 @@ No inventes nada. Sé amable, servicial y preséntate como "TecnoBot" en tu prim
 
 # --- FUNCIONES PRINCIPALES ---
 
-def local_css(file_name):
-    """Carga un archivo CSS local."""
-    try:
-        with open(file_name) as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.error(f"Error: No se encontró el archivo de estilos '{file_name}'. Asegúrate de que exista en la misma carpeta que este script.")
-
 def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
     """Carga la base de conocimientos desde el archivo JSON."""
     try:
@@ -100,9 +92,79 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 # --- APLICACIÓN PRINCIPAL DE STREAMLIT ---
 
 def main():
-    # --- Carga de Estilos CSS y Definición del Logo ---
-    local_css("style.css") # ¡Cargamos el archivo externo!
+    # --- Estilos CSS Embebidos para Máxima Compatibilidad ---
     LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    st.markdown(f"""
+    <style>
+        /* --- Contenedor Principal con Gradiente --- */
+        [data-testid="stAppViewContainer"] > .main {{
+            background-color: #2d2a4c;
+            background-image: linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
+        }}
+
+        /* --- Barra Lateral (Sidebar) --- */
+        [data-testid="stSidebar"] {{
+            border-right: 2px solid #a1c9f4;
+            background-color: #2d2a4c;
+        }}
+
+        .sidebar-logo {{
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 3px solid #a1c9f4;
+            box-shadow: 0 0 15px #a1c9f4;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }}
+
+        /* --- Título principal con efecto Neón --- */
+        h1 {{
+            color: #e6e6fa;
+            text-shadow: 0 0 8px rgba(161, 201, 244, 0.7), 0 0 10px rgba(161, 201, 244, 0.5);
+            text-align: center;
+            padding-top: 2rem;
+        }}
+
+        /* --- Contenedor del chat con brillo (Solución robusta) --- */
+        .chat-wrapper {{
+            border: 2px solid #4f4a7d;
+            box-shadow: 0 0 20px -5px #a1c9f4;
+            border-radius: 20px;
+            background-color: rgba(45, 42, 76, 0.8);
+            padding: 1rem;
+            margin-top: 1rem;
+        }}
+
+        /* --- Globos de chat --- */
+        [data-testid="stChatMessage"] {{
+            border-radius: 15px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }}
+
+        [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{
+            background-color: #4f4a7d;
+            border: 1px solid #a1c9f4;
+        }}
+
+        [data-testid="stChatMessage"][data-testid-stream-message-type="user"] {{
+            background-color: #3b3861;
+        }}
+
+        /* --- Input de texto del chat --- */
+        [data-testid="stChatInput"] {{
+            background-color: transparent;
+            border-top: 2px solid #a1c9f4;
+            padding-top: 1rem;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
 
     # --- Contenido de la App ---
     with st.sidebar:
@@ -159,3 +221,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
