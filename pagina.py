@@ -5,7 +5,7 @@ import json
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
     page_title="Chatbot del Instituto 13 de Julio",
-    page_icon="🎓",
+    page_icon="�",
     layout="centered"
 )
 
@@ -66,27 +66,20 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- ESTILOS CSS PERSONALIZADOS Y LOGO ---
-    # Nota: Los selectores de Streamlit (ej: .st-emotion-cache-*) pueden cambiar entre versiones.
-    # Estos estilos están probados para la versión actual pero podrían necesitar ajustes en el futuro.
-    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # He creado este logo basado en el del instituto. ¡Puedes cambiar la URL!
+    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # Logo basado en el del instituto. ¡Puedes cambiar la URL!
 
     st.markdown(f"""
         <style>
         /* --- Contenedor Principal con Gradiente --- */
-        [data-testid="stAppViewContainer"] > .main > .block-container {{
+        [data-testid="stAppViewContainer"] > .main {{
             background-color: #2d2a4c;
             background-image: linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
-            padding-top: 2rem;
-            padding-bottom: 2rem;
         }}
 
         /* --- Barra Lateral (Sidebar) --- */
         [data-testid="stSidebar"] {{
             border-right: 2px solid #a1c9f4;
             background-color: #2d2a4c;
-        }}
-        .st-emotion-cache-16txtl3 {{
-             padding: 0 !important;
         }}
         .sidebar-logo {{
             width: 120px;
@@ -97,15 +90,8 @@ def main():
             display: block;
             margin-left: auto;
             margin-right: auto;
-            margin-bottom: 1rem;
-        }}
-
-        /* --- Área de Chat --- */
-        [data-testid="stVerticalBlockBorderWrapper"] {{
-            border: 2px solid #4f4a7d;
-            box-shadow: 0 0 20px -5px #a1c9f4; /* El brillo celeste que pediste */
-            border-radius: 20px;
-            background-color: rgba(45, 42, 76, 0.8);
+            margin-top: 2rem;
+            margin-bottom: 2rem;
         }}
 
         /* --- Título principal con efecto Neón --- */
@@ -113,7 +99,17 @@ def main():
             color: #e6e6fa;
             text-shadow: 0 0 8px rgba(161, 201, 244, 0.7), 0 0 10px rgba(161, 201, 244, 0.5);
             text-align: center;
-            margin-bottom: 1rem;
+            padding-top: 2rem;
+        }}
+        
+        /* --- Contenedor del chat con brillo (Solución robusta) --- */
+        .chat-wrapper {{
+            border: 2px solid #4f4a7d;
+            box-shadow: 0 0 20px -5px #a1c9f4; /* El brillo celeste que pediste */
+            border-radius: 20px;
+            background-color: rgba(45, 42, 76, 0.8);
+            padding: 1rem;
+            margin-top: 1rem;
         }}
         
         /* --- Globos de chat --- */
@@ -135,6 +131,7 @@ def main():
         [data-testid="stChatInput"] {{
             background-color: transparent;
             border-top: 2px solid #a1c9f4;
+            padding-top: 1rem;
         }}
         </style>
     """, unsafe_allow_html=True)
@@ -167,11 +164,14 @@ def main():
             {"role": "assistant", "content": "¡Hola! Soy TecnoBot, el asistente virtual del Instituto 13 de Julio. ¿En qué puedo ayudarte?"}
         ]
 
+    # Envolvemos el área del chat en nuestro div personalizado
+    st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
     chat_container = st.container(height=500)
     with chat_container:
         for mensaje in st.session_state.mensajes:
             with st.chat_message(mensaje["role"], avatar="🤖" if mensaje["role"] == "assistant" else "🧑‍💻"):
                 st.markdown(mensaje["content"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if prompt_usuario := st.chat_input("Escribe tu pregunta aquí..."):
         st.session_state.mensajes.append({"role": "user", "content": prompt_usuario})
