@@ -41,20 +41,46 @@ def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
 
 @st.cache_data
 def aplanar_conocimiento(_base_de_conocimiento):
-    """Convierte la base de conocimiento anidada en una lista plana de documentos de texto."""
+    """
+    Convierte la base de conocimiento en una lista de documentos descriptivos para la búsqueda semántica.
+    Esto mejora drásticamente la precisión de la búsqueda.
+    """
     documentos = []
     if _base_de_conocimiento is None:
         return documentos
     
+    # Procesa temas generales
     for topic, data in _base_de_conocimiento.items():
         if topic == "material_academico":
-            for year, subjects in data.items():
-                for subject_name, subject_data in subjects.items():
-                    info = f"{subject_data.get('content', '')} El profesor es {subject_data.get('profesor', 'No asignado')}."
-                    documentos.append(info)
-        elif isinstance(data, dict):
-             documentos.append(data.get('content', ''))
+            continue # Se procesa por separado
+        
+        if isinstance(data, dict) and 'content' in data:
+            contenido = data['content']
+            # Construye un documento más rico usando el nombre del tema (topic)
+            titulo_tema = topic.replace('_', ' ').title()
+            documentos.append(f"Información sobre {titulo_tema}: {contenido}")
+
+    # Procesa el material académico anidado
+    if "material_academico" in _base_de_conocimiento:
+        for year, subjects in _base_de_conocimiento["material_academico"].items():
+            for subject_name, subject_data in subjects.items():
+                if isinstance(subject_data, dict):
+                    # Crea un documento rico en contexto para cada materia
+                    info = (
+                        f"Materia: {subject_name.replace('_', ' ').title()} de {year.replace('_', ' ')}. "
+                        f"{subject_data.get('content', '')} "
+                        f"Profesor/a: {subject_data.get('profesor', 'No asignado')}. "
+                    )
+                    # Añade info de evaluaciones
+                    if subject_data.get('evaluaciones'):
+                        info += "Próximas Evaluaciones: "
+                        for eval in subject_data['evaluaciones']:
+                            info += f"Fecha: {eval.get('fecha', 'N/A')}, Temas: {eval.get('temas', 'N/A')}. "
+                    
+                    documentos.append(info.strip())
+
     return [doc for doc in documentos if doc] # Filtra documentos vacíos
+
 
 @st.cache_resource
 def cargar_modelo_embeddings():
@@ -115,7 +141,7 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- Estilos CSS Embebidos ---
-    LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
         /* Definición de Animaciones, etc. */
