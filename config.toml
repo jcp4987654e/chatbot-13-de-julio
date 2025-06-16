@@ -1,0 +1,7 @@
+[theme]
+base="dark"
+primaryColor="#a1c9f4"  # Un celeste pastel suave para elementos primarios
+backgroundColor="#2d2a4c"  # Un morado oscuro y profundo para el fondo principal
+secondaryBackgroundColor="#4f4a7d"  # Un morado pastel más claro para fondos secundarios
+textColor="#e6e6fa"      # Un lavanda muy claro para el texto, asegurando buena legibilidad
+font="sans-serif"
