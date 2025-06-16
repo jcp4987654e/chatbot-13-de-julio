@@ -15,7 +15,7 @@ st.set_page_config(
 
 # --- CONSTANTES Y CONFIGURACIÓN INICIAL ---
 
-MODELOS = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"]
+MODELOS = ["llama3-8b-8192", "llama3-70b-8192"]
 
 SYSTEM_PROMPT = """
 Eres un asistente virtual experto del "Instituto 13 de Julio" llamado "TecnoBot".
