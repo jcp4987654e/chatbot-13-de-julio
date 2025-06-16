@@ -4,6 +4,7 @@ import json
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import time
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -14,7 +15,7 @@ st.set_page_config(
 
 # --- CONSTANTES Y CONFIGURACIÓN INICIAL ---
 
-MODELOS = ["llama3-8b-8192", "llama3-70b-8192"]
+MODELOS = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"]
 
 SYSTEM_PROMPT = """
 Eres un asistente virtual experto del "Instituto 13 de Julio" llamado "TecnoBot".
@@ -43,44 +44,34 @@ def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
 def aplanar_conocimiento(_base_de_conocimiento):
     """
     Convierte la base de conocimiento en una lista de documentos descriptivos para la búsqueda semántica.
-    Esto mejora drásticamente la precisión de la búsqueda.
     """
     documentos = []
     if _base_de_conocimiento is None:
         return documentos
     
-    # Procesa temas generales
     for topic, data in _base_de_conocimiento.items():
         if topic == "material_academico":
-            continue # Se procesa por separado
-        
+            continue
         if isinstance(data, dict) and 'content' in data:
-            contenido = data['content']
-            # Construye un documento más rico usando el nombre del tema (topic)
             titulo_tema = topic.replace('_', ' ').title()
-            documentos.append(f"Información sobre {titulo_tema}: {contenido}")
+            documentos.append(f"Información sobre {titulo_tema}: {data['content']}")
 
-    # Procesa el material académico anidado
     if "material_academico" in _base_de_conocimiento:
         for year, subjects in _base_de_conocimiento["material_academico"].items():
             for subject_name, subject_data in subjects.items():
                 if isinstance(subject_data, dict):
-                    # Crea un documento rico en contexto para cada materia
                     info = (
                         f"Materia: {subject_name.replace('_', ' ').title()} de {year.replace('_', ' ')}. "
                         f"{subject_data.get('content', '')} "
                         f"Profesor/a: {subject_data.get('profesor', 'No asignado')}. "
                     )
-                    # Añade info de evaluaciones
                     if subject_data.get('evaluaciones'):
                         info += "Próximas Evaluaciones: "
-                        for eval in subject_data['evaluaciones']:
-                            info += f"Fecha: {eval.get('fecha', 'N/A')}, Temas: {eval.get('temas', 'N/A')}. "
-                    
+                        for eval_item in subject_data['evaluaciones']:
+                            info += f"Fecha: {eval_item.get('fecha', 'N/A')}, Temas: {eval_item.get('temas', 'N/A')}. "
                     documentos.append(info.strip())
 
-    return [doc for doc in documentos if doc] # Filtra documentos vacíos
-
+    return [doc for doc in documentos if doc]
 
 @st.cache_resource
 def cargar_modelo_embeddings():
@@ -88,7 +79,7 @@ def cargar_modelo_embeddings():
     try:
         return SentenceTransformer('all-MiniLM-L6-v2')
     except Exception as e:
-        st.error(f"Error al descargar el modelo de embeddings: {e}. Puede que necesites una conexión a internet estable.")
+        st.error(f"Error al descargar el modelo de embeddings: {e}.")
         return None
 
 @st.cache_data
@@ -100,15 +91,14 @@ def crear_indice_semantico(documentos, _modelo):
 
 def buscar_contexto_semantico(query, _modelo, documentos, embeddings_corpus, top_k=3, umbral=0.4):
     """
-    Busca contexto usando similitud semántica en lugar de palabras clave.
+    Busca contexto usando similitud semántica.
     """
     if embeddings_corpus is None or not hasattr(_modelo, 'encode'):
-        return "La base de conocimientos no está lista para búsqueda semántica."
+        return "La base de conocimientos no está lista."
         
     embedding_consulta = _modelo.encode([query])
     similitudes = cosine_similarity(embedding_consulta, embeddings_corpus)[0]
     
-    # Obtiene los índices de los resultados más similares
     indices_similares = np.argsort(similitudes)[::-1]
     
     contexto_encontrado = ""
@@ -123,104 +113,221 @@ def buscar_contexto_semantico(query, _modelo, documentos, embeddings_corpus, top
                 
     if not contexto_encontrado:
         return "No se encontró información relevante para tu consulta."
-        
     return contexto_encontrado
 
-
-def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
-    """Envía la petición a la API de Groq."""
+def generar_respuesta_stream(cliente_groq, modelo_seleccionado, historial_chat):
+    """
+    Genera una respuesta del modelo y la devuelve como un stream (generador).
+    """
     try:
-        respuesta = cliente_groq.chat.completions.create(
+        stream = cliente_groq.chat.completions.create(
             model=modelo_seleccionado,
             messages=historial_chat,
             temperature=0.5,
             max_tokens=1024,
+            stream=True,
         )
-        return respuesta.choices[0].message.content
+        for chunk in stream:
+            yield chunk.choices[0].delta.content or ""
     except Exception as e:
         st.error(f"Ocurrió un error al contactar la API de Groq: {e}")
-        return None
+        yield ""
 
 # --- APLICACIÓN PRINCIPAL DE STREAMLIT ---
 
 def main():
-    # --- Estilos CSS Embebidos ---
-    LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    # --- Estilos CSS Embebidos con Diseño Responsivo ---
+    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
-        /* Definición de Animaciones, etc. */
-        @keyframes pulse {{ 0% {{ box-shadow: 0 0 10px #a1c9f4; }} 50% {{ box-shadow: 0 0 25px #a1c9f4; }} 100% {{ box-shadow: 0 0 10px #a1c9f4; }} }}
-        @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-        [data-testid="stAppViewContainer"] > .main {{ background-color: #2d2a4c; background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 20px), repeating-linear-gradient(-45deg, rgba(161, 201, 244, 0.05) 1px, transparent 1px, transparent 20px), linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%); }}
-        [data-testid="stSidebar"] {{ border-right: 2px solid #a1c9f4; background-color: #2d2a4c; }}
-        .sidebar-logo {{ width: 120px; height: 120px; border-radius: 50%; border: 3px solid #a1c9f4; display: block; margin: 2rem auto; animation: pulse 4s infinite ease-in-out; }}
-        h1 {{ color: #e6e6fa; text-shadow: 0 0 8px rgba(161, 201, 244, 0.7); text-align: center; padding-top: 2rem; }}
-        .chat-wrapper {{ border: 2px solid #4f4a7d; box-shadow: 0 0 20px -5px #a1c9f4; border-radius: 20px; background-color: rgba(45, 42, 76, 0.8); padding: 1rem; margin-top: 1rem; }}
-        [data-testid="stChatMessage"] {{ border-radius: 15px; padding: 1rem; margin-bottom: 1rem; animation: fadeIn 0.5s ease-out; }}
-        [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{ background-color: #4f4a7d; border: 1px solid #a1c9f4; }}
-        [data-testid="stChatMessage"][data-testid-stream-message-type="user"] {{ background-color: #3b3861; }}
-        [data-testid="stChatInput"] {{ background-color: transparent; border-top: 2px solid #a1c9f4; padding-top: 1rem; }}
+        /* --- Definición de Animaciones --- */
+        @keyframes pulse {{
+            0% {{ box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4; }}
+            50% {{ box-shadow: 0 0 25px #a1c9f4, 0 0 40px #a1c9f4; }}
+            100% {{ box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4; }}
+        }}
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(20px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+
+        /* --- Estilos Splash Screen --- */
+        .splash-container {{
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 80vh; /* Ocupa casi toda la pantalla verticalmente */
+            animation: fadeIn 1s ease-in-out;
+        }}
+        .splash-logo {{
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            margin-bottom: 2rem;
+            animation: pulse 3s infinite;
+        }}
+        .splash-title {{
+            font-size: 2.5rem;
+            color: #e6e6fa;
+            text-shadow: 0 0 10px rgba(161, 201, 244, 0.7);
+            margin-bottom: 2rem;
+        }}
+        .entry-button {{
+            background-color: #a1c9f4;
+            color: #2d2a4c;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }}
+        .entry-button:hover {{
+            background-color: #e6e6fa;
+            box-shadow: 0 0 20px #a1c9f4;
+        }}
+
+        /* --- Estilos App Principal --- */
+        .app-container {{
+            animation: fadeIn 0.8s ease-in-out;
+        }}
+        [data-testid="stAppViewContainer"] > .main {{
+            background-color: #2d2a4c;
+            background-image: 
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 20px),
+                repeating-linear-gradient(-45deg, rgba(161, 201, 244, 0.05), rgba(161, 201, 244, 0.05) 1px, transparent 1px, transparent 20px),
+                linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
+        }}
+        [data-testid="stSidebar"] {{
+            border-right: 2px solid #a1c9f4;
+            background-color: #2d2a4c;
+        }}
+        .sidebar-logo {{
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 3px solid #a1c9f4;
+            display: block;
+            margin: 2rem auto;
+            animation: pulse 4s infinite ease-in-out;
+        }}
+        h1 {{
+            color: #e6e6fa;
+            text-shadow: 0 0 8px rgba(161, 201, 244, 0.7);
+            text-align: center;
+            padding-top: 2rem;
+        }}
+        .chat-wrapper {{
+            border: 2px solid #4f4a7d;
+            box-shadow: 0 0 20px -5px #a1c9f4;
+            border-radius: 20px;
+            background-color: rgba(45, 42, 76, 0.8);
+            padding: 1rem;
+            margin-top: 1rem;
+        }}
+        [data-testid="stChatMessage"] {{
+            border-radius: 15px; padding: 1rem; margin-bottom: 1rem;
+        }}
+        [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{
+            background-color: #4f4a7d; border: 1px solid #a1c9f4;
+        }}
+        [data-testid="stChatMessage"][data-testid-stream-message-type="user"] {{
+            background-color: #3b3861;
+        }}
+        [data-testid="stChatInput"] {{
+            background-color: transparent; border-top: 2px solid #a1c9f4; padding-top: 1rem;
+        }}
+        
+        /* --- Diseño Responsivo --- */
+        @media (max-width: 768px) {{
+            .splash-logo {{ width: 120px; height: 120px; }}
+            .splash-title {{ font-size: 1.8rem; }}
+            .chat-wrapper {{ margin-top: 0.5rem; padding: 0.5rem; }}
+            h1 {{ font-size: 1.8rem; padding-top: 1rem; }}
+            .sidebar-logo {{ width: 80px; height: 80px; }}
+        }}
     </style>
     """, unsafe_allow_html=True)
-
-    # --- Carga de modelos y datos (cacheado y sin spinner de bloqueo) ---
-    # Streamlit mostrará un indicador de "Running..." en la esquina superior derecha
-    # la primera vez que estas funciones se ejecuten. En las siguientes, será instantáneo.
-    base_de_conocimiento = cargar_base_de_conocimiento()
     
-    # Detener si el archivo JSON no se puede cargar
-    if base_de_conocimiento is None:
-        st.stop()
+    # --- Lógica de Splash Screen vs App Principal ---
+    if 'show_chat' not in st.session_state:
+        st.session_state.show_chat = False
+
+    if not st.session_state.show_chat:
+        # --- PANTALLA DE BIENVENIDA ---
+        st.markdown(f"""
+            <div class="splash-container">
+                <img src="{LOGO_URL}" class="splash-logo">
+                <h1 class="splash-title">Bienvenido a TecnoBot</h1>
+            </div>
+        """, unsafe_allow_html=True)
         
-    documentos_planos = aplanar_conocimiento(base_de_conocimiento)
-    modelo_embeddings = cargar_modelo_embeddings()
-    indice_embeddings = crear_indice_semantico(documentos_planos, modelo_embeddings)
+        # El botón se centra usando columnas
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            if st.button("Ingresar al Chat", key="enter_button", help="Haz clic para comenzar a chatear", use_container_width=True):
+                st.session_state.show_chat = True
+                st.rerun()
 
-    # Añadir un chequeo explícito para asegurarnos de que el modelo cargó bien
-    if indice_embeddings is None:
-        st.warning("El motor de conocimiento aún se está inicializando. Esto puede tardar unos minutos la primera vez. Por favor, espera o actualiza la página.")
-        st.stop()
-    
-    with st.sidebar:
-        st.markdown(f'<img src="{LOGO_URL}" class="sidebar-logo">', unsafe_allow_html=True)
-        st.header("Configuración")
-        modelo_seleccionado = st.selectbox("Elige tu modelo de IA:", MODELOS, index=1)
-        try:
-            cliente_groq = groq.Groq(api_key=st.secrets["GROQ_API_KEY"])
-        except Exception:
-            st.error("API Key de Groq no configurada.")
-            st.stop()
-        st.info("Este chatbot entiende el significado, no solo las palabras.")
+    else:
+        # --- APP PRINCIPAL DEL CHATBOT ---
+        st.markdown('<div class="app-container">', unsafe_allow_html=True)
 
-    st.title("🎓 Chatbot del Instituto 13 de Julio")
+        # Carga de modelos y datos
+        with st.spinner("Conectando con TecnoBot..."):
+            base_de_conocimiento = cargar_base_de_conocimiento()
+            if base_de_conocimiento is None: st.stop()
+            documentos_planos = aplanar_conocimiento(base_de_conocimiento)
+            modelo_embeddings = cargar_modelo_embeddings()
+            indice_embeddings = crear_indice_semantico(documentos_planos, modelo_embeddings)
 
-    if "mensajes" not in st.session_state:
-        st.session_state.mensajes = [{"role": "assistant", "content": "¡Hola! Soy TecnoBot. ¿En qué puedo ayudarte?"}]
+            if indice_embeddings is None:
+                st.warning("El motor de conocimiento se está inicializando. Por favor, espera.")
+                st.stop()
+        
+        with st.sidebar:
+            st.markdown(f'<img src="{LOGO_URL}" class="sidebar-logo">', unsafe_allow_html=True)
+            st.header("Configuración")
+            modelo_seleccionado = st.selectbox("Elige tu modelo de IA:", MODELOS, index=1)
+            try:
+                cliente_groq = groq.Groq(api_key=st.secrets["GROQ_API_KEY"])
+            except Exception:
+                st.error("API Key de Groq no configurada.")
+                st.stop()
+            st.info("Este chatbot entiende el significado, no las palabras.")
 
-    st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
-    chat_container = st.container(height=500)
-    with chat_container:
+        st.title("🎓 Chatbot del Instituto 13 de Julio")
+
+        if "mensajes" not in st.session_state:
+            st.session_state.mensajes = [{"role": "assistant", "content": "¡Hola! Soy TecnoBot. ¿En qué puedo ayudarte?"}]
+
         for mensaje in st.session_state.mensajes:
             with st.chat_message(mensaje["role"], avatar="🤖" if mensaje["role"] == "assistant" else "🧑‍💻"):
                 st.markdown(mensaje["content"], unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    if prompt_usuario := st.chat_input("Escribe tu pregunta aquí..."):
-        st.session_state.mensajes.append({"role": "user", "content": prompt_usuario})
+        if prompt_usuario := st.chat_input("Escribe tu pregunta aquí..."):
+            st.session_state.mensajes.append({"role": "user", "content": prompt_usuario})
+            with st.chat_message("user", avatar="🧑‍💻"):
+                st.markdown(prompt_usuario)
 
-        # Usando la nueva búsqueda semántica
-        contexto_rag = buscar_contexto_semantico(prompt_usuario, modelo_embeddings, documentos_planos, indice_embeddings)
-        
-        system_prompt_con_contexto = f"{SYSTEM_PROMPT}\n\nCONTEXTO RELEVANTE:\n{contexto_rag}"
-        historial_para_api = [{"role": "system", "content": system_prompt_con_contexto}]
-        mensajes_relevantes = [msg for msg in st.session_state.mensajes if msg['role'] != 'system']
-        historial_para_api.extend(mensajes_relevantes[-10:])
+            with st.chat_message("assistant", avatar="🤖"):
+                contexto_rag = buscar_contexto_semantico(prompt_usuario, modelo_embeddings, documentos_planos, indice_embeddings)
+                system_prompt_con_contexto = f"{SYSTEM_PROMPT}\n\nCONTEXTO RELEVANTE:\n{contexto_rag}"
+                
+                historial_para_api = [{"role": "system", "content": system_prompt_con_contexto}]
+                mensajes_relevantes = [msg for msg in st.session_state.mensajes if msg['role'] != 'system']
+                historial_para_api.extend(mensajes_relevantes[-10:])
+                
+                response_stream = generar_respuesta_stream(cliente_groq, modelo_seleccionado, historial_para_api)
+                full_response = st.write_stream(response_stream)
+            
+            st.session_state.mensajes.append({"role": "assistant", "content": full_response})
+            st.rerun()
 
-        respuesta_bot = generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_para_api)
-        if respuesta_bot:
-            st.session_state.mensajes.append({"role": "assistant", "content": respuesta_bot})
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.rerun()
 
 if __name__ == "__main__":
     main()
