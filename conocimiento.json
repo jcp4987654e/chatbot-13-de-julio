@@ -74,5 +74,64 @@
     "autoridades": {
         "keywords": ["autoridades", "director", "directivos", "rector"],
         "content": "Para información sobre las autoridades del instituto, por favor consulta el organigrama en nuestro sitio web o en secretaría."
+    },
+    "material_academico": {
+        "1er_ano": {
+            "matematica": {
+                "profesor": "Prof. Carlos Peralta",
+                "keywords": ["matematica 1", "matematica primer año"],
+                "content": "Material de estudio para Matemática de 1er Año.",
+                "evaluaciones": [
+                    {"fecha": "2025-05-15", "temas": "Funciones Lineales, Sistemas de Ecuaciones."}
+                ],
+                "temas": [
+                    {"nombre": "Funciones Lineales", "keywords": ["funcion lineal", "rectas"], "apuntes": "https://example.com/mat1/func-lineal", "clases": [{"nombre": "Clase 1: Pendiente", "link": "https://example.com/clase1"}]},
+                    {"nombre": "Sistemas de Ecuaciones", "keywords": ["sistemas de ecuaciones", "igualacion"], "apuntes": "https://example.com/mat1/sist-ecuaciones", "clases": []}
+                ]
+            },
+            "lengua": {
+                "profesor": "Prof. Ana Torres",
+                "keywords": ["lengua 1", "literatura primer año"],
+                "content": "Material de estudio para Lengua y Literatura de 1er Año.",
+                "evaluaciones": [{"fecha": "2025-05-20", "temas": "Análisis sintáctico, El Héroe Clásico."}],
+                "temas": [
+                    {"nombre": "Análisis Sintáctico", "keywords": ["sintaxis", "oracion bimembre"], "apuntes": "https://example.com/leng1/sintaxis", "clases": []}
+                ]
+            },
+            "taller": {
+                "profesor": "Prof. Jorge Nuñez",
+                "keywords": ["taller 1", "taller primer año"],
+                "content": "Material de estudio para Taller de 1er Año.",
+                "evaluaciones": [{"fecha": "2025-06-10", "temas": "Uso de herramientas manuales, Normas de seguridad."}],
+                "temas": [
+                    {"nombre": "Seguridad e Higiene", "keywords": ["seguridad", "higiene"], "apuntes": "https://example.com/taller1/seguridad", "clases": []}
+                ]
+            }
+        },
+        "2do_ano": {
+             "matematica": {"profesor": "Prof. Carlos Peralta", "keywords": ["matematica 2"], "content": "Material de Matemática de 2do Año.", "evaluaciones": [], "temas": []},
+             "lengua": {"profesor": "Prof. Ana Torres", "keywords": ["lengua 2"], "content": "Material de Lengua de 2do Año.", "evaluaciones": [], "temas": []},
+             "taller": {"profesor": "Prof. Jorge Nuñez", "keywords": ["taller 2"], "content": "Material de Taller de 2do Año.", "evaluaciones": [], "temas": []}
+        },
+        "3er_ano": {
+             "matematica": {"profesor": "Prof. Laura Gomez", "keywords": ["matematica 3"], "content": "Material de Matemática de 3er Año.", "evaluaciones": [], "temas": []},
+             "lengua": {"profesor": "Prof. Martin Fierro", "keywords": ["lengua 3"], "content": "Material de Lengua de 3er Año.", "evaluaciones": [], "temas": []},
+             "taller": {"profesor": "Prof. Ricardo Diaz", "keywords": ["taller 3"], "content": "Material de Taller de 3er Año.", "evaluaciones": [], "temas": []}
+        },
+        "4to_ano": {
+             "matematica": {"profesor": "Prof. Laura Gomez", "keywords": ["matematica 4"], "content": "Material de Matemática de 4to Año.", "evaluaciones": [], "temas": []},
+             "lengua": {"profesor": "Prof. Martin Fierro", "keywords": ["lengua 4"], "content": "Material de Lengua de 4to Año.", "evaluaciones": [], "temas": []},
+             "taller": {"profesor": "Prof. Ricardo Diaz", "keywords": ["taller 4"], "content": "Material de Taller de 4to Año.", "evaluaciones": [], "temas": []}
+        },
+        "5to_ano": {
+             "matematica": {"profesor": "Prof. Susana Rios", "keywords": ["matematica 5"], "content": "Material de Matemática de 5to Año.", "evaluaciones": [], "temas": []},
+             "lengua": {"profesor": "Prof. Esteban Correa", "keywords": ["lengua 5"], "content": "Material de Lengua de 5to Año.", "evaluaciones": [], "temas": []},
+             "taller": {"profesor": "Prof. Alberto Pardo", "keywords": ["taller 5"], "content": "Material de Taller de 5to Año.", "evaluaciones": [], "temas": []}
+        },
+        "6to_ano": {
+             "matematica": {"profesor": "Prof. Susana Rios", "keywords": ["matematica 6"], "content": "Material de Matemática de 6to Año.", "evaluaciones": [], "temas": []},
+             "lengua": {"profesor": "Prof. Esteban Correa", "keywords": ["lengua 6"], "content": "Material de Lengua de 6to Año.", "evaluaciones": [], "temas": []},
+             "taller": {"profesor": "Prof. Alberto Pardo", "keywords": ["taller 6"], "content": "Material de Taller de 6to Año.", "evaluaciones": [], "temas": []}
+        }
     }
 }
