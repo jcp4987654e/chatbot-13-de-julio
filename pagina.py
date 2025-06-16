@@ -105,7 +105,7 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- Estilos CSS Embebidos para Máxima Compatibilidad ---
-    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
         /* --- Definición de Animaciones --- */
