@@ -150,6 +150,10 @@ def main():
             from {{ opacity: 0; transform: translateY(20px); }}
             to {{ opacity: 1; transform: translateY(0); }}
         }}
+        @keyframes fadeOut {{
+            from {{ opacity: 1; }}
+            to {{ opacity: 0; }}
+        }}
 
         /* --- Estilos Splash Screen --- */
         .splash-container {{
@@ -157,7 +161,7 @@ def main():
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            height: 80vh; /* Ocupa casi toda la pantalla verticalmente */
+            height: 90vh; /* Ocupa toda la pantalla verticalmente */
             animation: fadeIn 1s ease-in-out;
         }}
         .splash-logo {{
@@ -172,21 +176,6 @@ def main():
             color: #e6e6fa;
             text-shadow: 0 0 10px rgba(161, 201, 244, 0.7);
             margin-bottom: 2rem;
-        }}
-        .entry-button {{
-            background-color: #a1c9f4;
-            color: #2d2a4c;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 50px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }}
-        .entry-button:hover {{
-            background-color: #e6e6fa;
-            box-shadow: 0 0 20px #a1c9f4;
         }}
 
         /* --- Estilos App Principal --- */
@@ -252,40 +241,40 @@ def main():
     """, unsafe_allow_html=True)
     
     # --- Lógica de Splash Screen vs App Principal ---
-    if 'show_chat' not in st.session_state:
-        st.session_state.show_chat = False
-
-    if not st.session_state.show_chat:
-        # --- PANTALLA DE BIENVENIDA ---
-        st.markdown(f"""
-            <div class="splash-container">
-                <img src="{LOGO_URL}" class="splash-logo">
-                <h1 class="splash-title">Bienvenido a TecnoBot</h1>
-            </div>
-        """, unsafe_allow_html=True)
+    if 'app_ready' not in st.session_state:
+        # Mostrar Splash Screen y cargar todo en segundo plano
+        splash_placeholder = st.empty()
+        with splash_placeholder.container():
+            st.markdown(f"""
+                <div class="splash-container">
+                    <img src="{LOGO_URL}" class="splash-logo">
+                    <h1 class="splash-title">Bienvenido a TecnoBot</h1>
+                </div>
+            """, unsafe_allow_html=True)
         
-        # El botón se centra usando columnas
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("Ingresar al Chat", key="enter_button", help="Haz clic para comenzar a chatear", use_container_width=True):
-                st.session_state.show_chat = True
-                st.rerun()
+        # Carga pesada de modelos
+        st.session_state.base_de_conocimiento = cargar_base_de_conocimiento()
+        st.session_state.documentos_planos = aplanar_conocimiento(st.session_state.base_de_conocimiento)
+        st.session_state.modelo_embeddings = cargar_modelo_embeddings()
+        st.session_state.indice_embeddings = crear_indice_semantico(st.session_state.documentos_planos, st.session_state.modelo_embeddings)
+        
+        # Espera de 3 segundos
+        time.sleep(3)
+        st.session_state.app_ready = True
+        splash_placeholder.empty() # Limpiar la splash screen
+        st.rerun()
 
     else:
         # --- APP PRINCIPAL DEL CHATBOT ---
-        st.markdown('<div class="app-container">', unsafe_allow_html=True)
+        # Recuperar datos cargados desde el session_state
+        base_de_conocimiento = st.session_state.base_de_conocimiento
+        documentos_planos = st.session_state.documentos_planos
+        modelo_embeddings = st.session_state.modelo_embeddings
+        indice_embeddings = st.session_state.indice_embeddings
 
-        # Carga de modelos y datos
-        with st.spinner("Conectando con TecnoBot..."):
-            base_de_conocimiento = cargar_base_de_conocimiento()
-            if base_de_conocimiento is None: st.stop()
-            documentos_planos = aplanar_conocimiento(base_de_conocimiento)
-            modelo_embeddings = cargar_modelo_embeddings()
-            indice_embeddings = crear_indice_semantico(documentos_planos, modelo_embeddings)
-
-            if indice_embeddings is None:
-                st.warning("El motor de conocimiento se está inicializando. Por favor, espera.")
-                st.stop()
+        if indice_embeddings is None:
+            st.error("Hubo un problema al inicializar el motor de conocimiento. Por favor, recarga la página.")
+            st.stop()
         
         with st.sidebar:
             st.markdown(f'<img src="{LOGO_URL}" class="sidebar-logo">', unsafe_allow_html=True)
@@ -296,7 +285,7 @@ def main():
             except Exception:
                 st.error("API Key de Groq no configurada.")
                 st.stop()
-            st.info("Este chatbot entiende el significado, no las palabras.")
+            st.info("Este chatbot entiende el significado, no solo las palabras.")
 
         st.title("🎓 Chatbot del Instituto 13 de Julio")
 
@@ -313,6 +302,10 @@ def main():
                 st.markdown(prompt_usuario)
 
             with st.chat_message("assistant", avatar="🤖"):
+                thinking_placeholder = st.empty()
+                thinking_placeholder.markdown("Tirando magia... ✨")
+                start_time = time.time() # Registrar tiempo de inicio
+
                 contexto_rag = buscar_contexto_semantico(prompt_usuario, modelo_embeddings, documentos_planos, indice_embeddings)
                 system_prompt_con_contexto = f"{SYSTEM_PROMPT}\n\nCONTEXTO RELEVANTE:\n{contexto_rag}"
                 
@@ -321,13 +314,16 @@ def main():
                 historial_para_api.extend(mensajes_relevantes[-10:])
                 
                 response_stream = generar_respuesta_stream(cliente_groq, modelo_seleccionado, historial_para_api)
-                full_response = st.write_stream(response_stream)
+                
+                # Asegurar que el mensaje de "pensando" se muestre mínimo 2s
+                duration = time.time() - start_time
+                if duration < 2:
+                    time.sleep(2 - duration)
+
+                full_response = thinking_placeholder.write_stream(response_stream)
             
             st.session_state.mensajes.append({"role": "assistant", "content": full_response})
             st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
 
 if __name__ == "__main__":
     main()
