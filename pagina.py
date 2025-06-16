@@ -85,7 +85,11 @@ def aplanar_conocimiento(_base_de_conocimiento):
 @st.cache_resource
 def cargar_modelo_embeddings():
     """Carga el modelo de sentence-transformers. Se cachea para no cargarlo en cada ejecución."""
-    return SentenceTransformer('all-MiniLM-L6-v2')
+    try:
+        return SentenceTransformer('all-MiniLM-L6-v2')
+    except Exception as e:
+        st.error(f"Error al descargar el modelo de embeddings: {e}. Puede que necesites una conexión a internet estable.")
+        return None
 
 @st.cache_data
 def crear_indice_semantico(documentos, _modelo):
@@ -159,14 +163,22 @@ def main():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- Carga de modelos y datos (cacheado) ---
-    with st.spinner("Calibrando el motor de conocimiento..."):
-        base_de_conocimiento = cargar_base_de_conocimiento()
-        documentos_planos = aplanar_conocimiento(base_de_conocimiento)
-        modelo_embeddings = cargar_modelo_embeddings()
-        indice_embeddings = crear_indice_semantico(documentos_planos, modelo_embeddings)
-
+    # --- Carga de modelos y datos (cacheado y sin spinner de bloqueo) ---
+    # Streamlit mostrará un indicador de "Running..." en la esquina superior derecha
+    # la primera vez que estas funciones se ejecuten. En las siguientes, será instantáneo.
+    base_de_conocimiento = cargar_base_de_conocimiento()
+    
+    # Detener si el archivo JSON no se puede cargar
     if base_de_conocimiento is None:
+        st.stop()
+        
+    documentos_planos = aplanar_conocimiento(base_de_conocimiento)
+    modelo_embeddings = cargar_modelo_embeddings()
+    indice_embeddings = crear_indice_semantico(documentos_planos, modelo_embeddings)
+
+    # Añadir un chequeo explícito para asegurarnos de que el modelo cargó bien
+    if indice_embeddings is None:
+        st.warning("El motor de conocimiento aún se está inicializando. Esto puede tardar unos minutos la primera vez. Por favor, espera o actualiza la página.")
         st.stop()
     
     with st.sidebar:
