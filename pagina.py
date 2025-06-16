@@ -14,7 +14,7 @@ st.set_page_config(
 
 # --- CONSTANTES Y CONFIGURACIÓN INICIAL ---
 
-MODELOS = ["llama3-8b-8192", "llama3-70b-8192", "mixtral-8x7b-32768"]
+MODELOS = ["llama3-8b-8192", "llama3-70b-8192"]
 
 SYSTEM_PROMPT = """
 Eres un asistente virtual experto del "Instituto 13 de Julio" llamado "TecnoBot".
@@ -145,7 +145,7 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 
 def main():
     # --- Estilos CSS Embebidos ---
-    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
+    LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
         /* Definición de Animaciones, etc. */
