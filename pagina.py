@@ -1,6 +1,9 @@
 import streamlit as st
 import groq
 import json
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
@@ -23,8 +26,9 @@ No inventes nada. Sé amable, servicial y preséntate como "TecnoBot" en tu prim
 
 # --- FUNCIONES PRINCIPALES ---
 
+@st.cache_data
 def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
-    """Carga la base de conocimientos desde el archivo JSON."""
+    """Carga la base de conocimientos desde el archivo JSON. Cacheado para eficiencia."""
     try:
         with open(ruta_archivo, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -35,55 +39,61 @@ def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
         st.error(f"Error Crítico: El archivo '{ruta_archivo}' no tiene un formato JSON válido.")
         return None
 
-def buscar_contexto_relevante(query, base_de_conocimiento):
-    """
-    Busca palabras clave en la consulta para encontrar TODA la información relevante.
-    Ahora puede recopilar múltiples contextos.
-    """
-    if base_de_conocimiento is None:
-        return "Error: la base de conocimientos no está disponible."
+@st.cache_data
+def aplanar_conocimiento(_base_de_conocimiento):
+    """Convierte la base de conocimiento anidada en una lista plana de documentos de texto."""
+    documentos = []
+    if _base_de_conocimiento is None:
+        return documentos
     
-    query_lower = query.lower()
-    contexto_encontrado = ""
-    temas_ya_anadidos = set() # Para evitar duplicar la misma información
+    for topic, data in _base_de_conocimiento.items():
+        if topic == "material_academico":
+            for year, subjects in data.items():
+                for subject_name, subject_data in subjects.items():
+                    info = f"{subject_data.get('content', '')} El profesor es {subject_data.get('profesor', 'No asignado')}."
+                    documentos.append(info)
+        elif isinstance(data, dict):
+             documentos.append(data.get('content', ''))
+    return [doc for doc in documentos if doc] # Filtra documentos vacíos
 
-    # Itera sobre toda la base de conocimientos
-    for topic, data in base_de_conocimiento.items():
-        if topic == "material_academico": continue # Se maneja en el siguiente bucle
+@st.cache_resource
+def cargar_modelo_embeddings():
+    """Carga el modelo de sentence-transformers. Se cachea para no cargarlo en cada ejecución."""
+    return SentenceTransformer('all-MiniLM-L6-v2')
+
+@st.cache_data
+def crear_indice_semantico(documentos, _modelo):
+    """Crea los embeddings para la base de conocimientos."""
+    if not documentos or _modelo is None:
+        return None
+    return _modelo.encode(documentos)
+
+def buscar_contexto_semantico(query, _modelo, documentos, embeddings_corpus, top_k=3, umbral=0.4):
+    """
+    Busca contexto usando similitud semántica en lugar de palabras clave.
+    """
+    if embeddings_corpus is None or not hasattr(_modelo, 'encode'):
+        return "La base de conocimientos no está lista para búsqueda semántica."
         
-        if isinstance(data, dict) and 'keywords' in data:
-            for keyword in data.get("keywords", []):
-                if keyword in query_lower and topic not in temas_ya_anadidos:
-                    contexto_encontrado += f"- {data.get('content', '')}\n"
-                    temas_ya_anadidos.add(topic)
-                    break # Sale del bucle de keywords para este tema y pasa al siguiente
-
-    # Busca específicamente en el material académico
-    if "material_academico" in base_de_conocimiento:
-        for year, subjects in base_de_conocimiento["material_academico"].items():
-            for subject_name, subject_data in subjects.items():
-                subject_id = f"{year}-{subject_name}" # ID único para cada materia
-                if subject_id in temas_ya_anadidos: continue
-
-                for keyword in subject_data.get("keywords", []):
-                    if keyword in query_lower:
-                        info = f"\n**{subject_data.get('content', subject_name.replace('_', ' ').title())}**\n"
-                        info += f"Profesor: {subject_data.get('profesor', 'No asignado')}\n"
-                        if subject_data.get('evaluaciones'):
-                            info += "**Próximas Evaluaciones:**\n"
-                            for eval in subject_data['evaluaciones']:
-                                info += f"  - Fecha: {eval['fecha']}, Temas: {eval['temas']}\n"
-                        if subject_data.get('temas'):
-                             info += "**Temas y Apuntes:**\n"
-                             for tema in subject_data['temas']:
-                                 info += f"  - [{tema['nombre']}]({tema['apuntes']})\n"
-                        contexto_encontrado += info
-                        temas_ya_anadidos.add(subject_id)
-                        break # Sale del bucle de keywords para esta materia y pasa a la siguiente
-
-    if not contexto_encontrado:
-        return base_de_conocimiento.get("info_general", {}).get("content", "No se encontró contexto específico.")
+    embedding_consulta = _modelo.encode([query])
+    similitudes = cosine_similarity(embedding_consulta, embeddings_corpus)[0]
     
+    # Obtiene los índices de los resultados más similares
+    indices_similares = np.argsort(similitudes)[::-1]
+    
+    contexto_encontrado = ""
+    textos_ya_anadidos = set()
+    
+    for idx in indices_similares:
+        if similitudes[idx] > umbral and len(textos_ya_anadidos) < top_k:
+            texto = documentos[idx]
+            if texto not in textos_ya_anadidos:
+                contexto_encontrado += f"- {texto}\n"
+                textos_ya_anadidos.add(texto)
+                
+    if not contexto_encontrado:
+        return "No se encontró información relevante para tu consulta."
+        
     return contexto_encontrado
 
 
@@ -104,136 +114,51 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 # --- APLICACIÓN PRINCIPAL DE STREAMLIT ---
 
 def main():
-    # --- Estilos CSS Embebidos para Máxima Compatibilidad ---
+    # --- Estilos CSS Embebidos ---
     LOGO_URL = "https://13dejulio.edu.ar/wp-content/uploads/2022/03/Isologotipo-13-de-Julio-400.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
-        /* --- Definición de Animaciones --- */
-        @keyframes pulse {{
-            0% {{
-                box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4;
-            }}
-            50% {{
-                box-shadow: 0 0 25px #a1c9f4, 0 0 40px #a1c9f4;
-            }}
-            100% {{
-                box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4;
-            }}
-        }}
-
-        @keyframes fadeIn {{
-            from {{
-                opacity: 0;
-                transform: translateY(10px);
-            }}
-            to {{
-                opacity: 1;
-                transform: translateY(0);
-            }}
-        }}
-
-        /* --- Contenedor Principal con líneas diagonales --- */
-        [data-testid="stAppViewContainer"] > .main {{
-            background-color: #2d2a4c;
-            background-image: 
-                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 20px),
-                repeating-linear-gradient(-45deg, rgba(161, 201, 244, 0.05), rgba(161, 201, 244, 0.05) 1px, transparent 1px, transparent 20px),
-                linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
-        }}
-
-        /* --- Barra Lateral (Sidebar) --- */
-        [data-testid="stSidebar"] {{
-            border-right: 2px solid #a1c9f4;
-            background-color: #2d2a4c;
-        }}
-
-        .sidebar-logo {{
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: 3px solid #a1c9f4;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-            animation: pulse 4s infinite ease-in-out; /* Animación de pulso aplicada */
-        }}
-
-        /* --- Título principal con efecto Neón --- */
-        h1 {{
-            color: #e6e6fa;
-            text-shadow: 0 0 8px rgba(161, 201, 244, 0.7), 0 0 10px rgba(161, 201, 244, 0.5);
-            text-align: center;
-            padding-top: 2rem;
-        }}
-
-        /* --- Contenedor del chat con brillo --- */
-        .chat-wrapper {{
-            border: 2px solid #4f4a7d;
-            box-shadow: 0 0 20px -5px #a1c9f4;
-            border-radius: 20px;
-            background-color: rgba(45, 42, 76, 0.8);
-            padding: 1rem;
-            margin-top: 1rem;
-        }}
-
-        /* --- Globos de chat con animación --- */
-        [data-testid="stChatMessage"] {{
-            border-radius: 15px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            animation: fadeIn 0.5s ease-out; /* Animación de fade-in aplicada */
-        }}
-
-        [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{
-            background-color: #4f4a7d;
-            border: 1px solid #a1c9f4;
-        }}
-
-        [data-testid="stChatMessage"][data-testid-stream-message-type="user"] {{
-            background-color: #3b3861;
-        }}
-
-        /* --- Input de texto del chat --- */
-        [data-testid="stChatInput"] {{
-            background-color: transparent;
-            border-top: 2px solid #a1c9f4;
-            padding-top: 1rem;
-        }}
+        /* Definición de Animaciones, etc. */
+        @keyframes pulse {{ 0% {{ box-shadow: 0 0 10px #a1c9f4; }} 50% {{ box-shadow: 0 0 25px #a1c9f4; }} 100% {{ box-shadow: 0 0 10px #a1c9f4; }} }}
+        @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
+        [data-testid="stAppViewContainer"] > .main {{ background-color: #2d2a4c; background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 20px), repeating-linear-gradient(-45deg, rgba(161, 201, 244, 0.05) 1px, transparent 1px, transparent 20px), linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%); }}
+        [data-testid="stSidebar"] {{ border-right: 2px solid #a1c9f4; background-color: #2d2a4c; }}
+        .sidebar-logo {{ width: 120px; height: 120px; border-radius: 50%; border: 3px solid #a1c9f4; display: block; margin: 2rem auto; animation: pulse 4s infinite ease-in-out; }}
+        h1 {{ color: #e6e6fa; text-shadow: 0 0 8px rgba(161, 201, 244, 0.7); text-align: center; padding-top: 2rem; }}
+        .chat-wrapper {{ border: 2px solid #4f4a7d; box-shadow: 0 0 20px -5px #a1c9f4; border-radius: 20px; background-color: rgba(45, 42, 76, 0.8); padding: 1rem; margin-top: 1rem; }}
+        [data-testid="stChatMessage"] {{ border-radius: 15px; padding: 1rem; margin-bottom: 1rem; animation: fadeIn 0.5s ease-out; }}
+        [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{ background-color: #4f4a7d; border: 1px solid #a1c9f4; }}
+        [data-testid="stChatMessage"][data-testid-stream-message-type="user"] {{ background-color: #3b3861; }}
+        [data-testid="stChatInput"] {{ background-color: transparent; border-top: 2px solid #a1c9f4; padding-top: 1rem; }}
     </style>
     """, unsafe_allow_html=True)
 
+    # --- Carga de modelos y datos (cacheado) ---
+    with st.spinner("Calibrando el motor de conocimiento..."):
+        base_de_conocimiento = cargar_base_de_conocimiento()
+        documentos_planos = aplanar_conocimiento(base_de_conocimiento)
+        modelo_embeddings = cargar_modelo_embeddings()
+        indice_embeddings = crear_indice_semantico(documentos_planos, modelo_embeddings)
 
-    # --- Contenido de la App ---
+    if base_de_conocimiento is None:
+        st.stop()
+    
     with st.sidebar:
         st.markdown(f'<img src="{LOGO_URL}" class="sidebar-logo">', unsafe_allow_html=True)
         st.header("Configuración")
-        modelo_seleccionado = st.selectbox(
-            "Elige tu modelo de IA:",
-            MODELOS,
-            index=1,
-            help="Llama3-70b es más potente, Llama3-8b es más rápido."
-        )
+        modelo_seleccionado = st.selectbox("Elige tu modelo de IA:", MODELOS, index=1)
         try:
             cliente_groq = groq.Groq(api_key=st.secrets["GROQ_API_KEY"])
         except Exception:
             st.error("API Key de Groq no configurada.")
             st.stop()
-        st.info("Este chatbot recuerda la conversación actual para dar respuestas más coherentes.")
+        st.info("Este chatbot entiende el significado, no solo las palabras.")
 
     st.title("🎓 Chatbot del Instituto 13 de Julio")
 
-    base_de_conocimiento = cargar_base_de_conocimiento()
-    if base_de_conocimiento is None:
-        st.stop()
-
     if "mensajes" not in st.session_state:
-        st.session_state.mensajes = [
-            {"role": "assistant", "content": "¡Hola! Soy TecnoBot, el asistente virtual del Instituto 13 de Julio. ¿En qué puedo ayudarte?"}
-        ]
+        st.session_state.mensajes = [{"role": "assistant", "content": "¡Hola! Soy TecnoBot. ¿En qué puedo ayudarte?"}]
 
-    # Envolvemos el área del chat en nuestro div personalizado para un estilo robusto
     st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
     chat_container = st.container(height=500)
     with chat_container:
@@ -245,9 +170,10 @@ def main():
     if prompt_usuario := st.chat_input("Escribe tu pregunta aquí..."):
         st.session_state.mensajes.append({"role": "user", "content": prompt_usuario})
 
-        contexto_rag = buscar_contexto_relevante(prompt_usuario, base_de_conocimiento)
+        # Usando la nueva búsqueda semántica
+        contexto_rag = buscar_contexto_semantico(prompt_usuario, modelo_embeddings, documentos_planos, indice_embeddings)
+        
         system_prompt_con_contexto = f"{SYSTEM_PROMPT}\n\nCONTEXTO RELEVANTE:\n{contexto_rag}"
-
         historial_para_api = [{"role": "system", "content": system_prompt_con_contexto}]
         mensajes_relevantes = [msg for msg in st.session_state.mensajes if msg['role'] != 'system']
         historial_para_api.extend(mensajes_relevantes[-10:])
@@ -260,4 +186,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
