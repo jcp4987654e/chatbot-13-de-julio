@@ -96,10 +96,37 @@ def main():
     LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
     st.markdown(f"""
     <style>
-        /* --- Contenedor Principal con Gradiente --- */
+        /* --- Definición de Animaciones --- */
+        @keyframes pulse {{
+            0% {{
+                box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4;
+            }}
+            50% {{
+                box-shadow: 0 0 25px #a1c9f4, 0 0 40px #a1c9f4;
+            }}
+            100% {{
+                box-shadow: 0 0 10px #a1c9f4, 0 0 15px #a1c9f4;
+            }}
+        }}
+
+        @keyframes fadeIn {{
+            from {{
+                opacity: 0;
+                transform: translateY(10px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
+            }}
+        }}
+
+        /* --- Contenedor Principal con líneas diagonales --- */
         [data-testid="stAppViewContainer"] > .main {{
             background-color: #2d2a4c;
-            background-image: linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
+            background-image: 
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03) 1px, transparent 1px, transparent 20px),
+                repeating-linear-gradient(-45deg, rgba(161, 201, 244, 0.05), rgba(161, 201, 244, 0.05) 1px, transparent 1px, transparent 20px),
+                linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
         }}
 
         /* --- Barra Lateral (Sidebar) --- */
@@ -113,12 +140,12 @@ def main():
             height: 120px;
             border-radius: 50%;
             border: 3px solid #a1c9f4;
-            box-shadow: 0 0 15px #a1c9f4;
             display: block;
             margin-left: auto;
             margin-right: auto;
             margin-top: 2rem;
             margin-bottom: 2rem;
+            animation: pulse 4s infinite ease-in-out; /* Animación de pulso aplicada */
         }}
 
         /* --- Título principal con efecto Neón --- */
@@ -129,7 +156,7 @@ def main():
             padding-top: 2rem;
         }}
 
-        /* --- Contenedor del chat con brillo (Solución robusta) --- */
+        /* --- Contenedor del chat con brillo --- */
         .chat-wrapper {{
             border: 2px solid #4f4a7d;
             box-shadow: 0 0 20px -5px #a1c9f4;
@@ -139,12 +166,12 @@ def main():
             margin-top: 1rem;
         }}
 
-        /* --- Globos de chat --- */
+        /* --- Globos de chat con animación --- */
         [data-testid="stChatMessage"] {{
             border-radius: 15px;
             padding: 1rem;
             margin-bottom: 1rem;
-            transition: all 0.3s ease;
+            animation: fadeIn 0.5s ease-out; /* Animación de fade-in aplicada */
         }}
 
         [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{
@@ -221,4 +248,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
