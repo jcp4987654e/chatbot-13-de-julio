@@ -5,7 +5,7 @@ import json
 # --- CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(
     page_title="Chatbot del Instituto 13 de Julio",
-    page_icon="�",
+    page_icon="🎓",
     layout="centered"
 )
 
@@ -23,7 +23,16 @@ No inventes nada. Sé amable, servicial y preséntate como "TecnoBot" en tu prim
 
 # --- FUNCIONES PRINCIPALES ---
 
+def local_css(file_name):
+    """Carga un archivo CSS local."""
+    try:
+        with open(file_name) as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.error(f"Error: No se encontró el archivo de estilos '{file_name}'. Asegúrate de que exista en la misma carpeta que este script.")
+
 def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
+    """Carga la base de conocimientos desde el archivo JSON."""
     try:
         with open(ruta_archivo, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -35,21 +44,47 @@ def cargar_base_de_conocimiento(ruta_archivo='conocimiento.json'):
         return None
 
 def buscar_contexto_relevante(query, base_de_conocimiento):
+    """Busca palabras clave en la consulta para encontrar información relevante."""
     if base_de_conocimiento is None:
         return "Error: la base de conocimientos no está disponible."
     query_lower = query.lower()
     contexto_encontrado = ""
+    # Busca en la información general
     for topic, data in base_de_conocimiento.items():
-        if isinstance(data, dict):
+        if isinstance(data, dict) and 'keywords' in data:
             for keyword in data.get("keywords", []):
                 if keyword in query_lower:
                     contexto_encontrado += f"- {data.get('content', '')}\n"
-                    break
+                    break # Evita añadir la misma info varias veces
+    # Busca en el material académico
+    if "material_academico" in base_de_conocimiento:
+        for year, subjects in base_de_conocimiento["material_academico"].items():
+            for subject_name, subject_data in subjects.items():
+                 for keyword in subject_data.get("keywords", []):
+                    if keyword in query_lower:
+                        # Formatea una respuesta bonita para el material académico
+                        info = f"**{subject_data.get('content', subject_name.replace('_', ' ').title())}**\n"
+                        info += f"Profesor: {subject_data.get('profesor', 'No asignado')}\n"
+                        # Añade información de evaluaciones si existe
+                        if subject_data.get('evaluaciones'):
+                            info += "**Próximas Evaluaciones:**\n"
+                            for eval in subject_data['evaluaciones']:
+                                info += f"  - Fecha: {eval['fecha']}, Temas: {eval['temas']}\n"
+                        # Añade información de temas si existe
+                        if subject_data.get('temas'):
+                             info += "**Temas y Apuntes:**\n"
+                             for tema in subject_data['temas']:
+                                 info += f"  - [{tema['nombre']}]({tema['apuntes']})\n"
+                        contexto_encontrado += info + "\n"
+                        break
+
+
     if not contexto_encontrado:
         return base_de_conocimiento.get("info_general", {}).get("content", "No se encontró contexto específico.")
     return contexto_encontrado
 
 def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
+    """Envía la petición a la API de Groq."""
     try:
         respuesta = cliente_groq.chat.completions.create(
             model=modelo_seleccionado,
@@ -65,77 +100,10 @@ def generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_chat):
 # --- APLICACIÓN PRINCIPAL DE STREAMLIT ---
 
 def main():
-    # --- ESTILOS CSS PERSONALIZADOS Y LOGO ---
-    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # Logo basado en el del instituto. ¡Puedes cambiar la URL!
+    # --- Carga de Estilos CSS y Definición del Logo ---
+    local_css("style.css") # ¡Cargamos el archivo externo!
+    LOGO_URL = "https://i.imgur.com/gJ5Ym2W.png" # ¡CAMBIA ESTA URL POR LA DE TU LOGO OFICIAL!
 
-    st.markdown(f"""
-        <style>
-        /* --- Contenedor Principal con Gradiente --- */
-        [data-testid="stAppViewContainer"] > .main {{
-            background-color: #2d2a4c;
-            background-image: linear-gradient(180deg, #2d2a4c 0%, #4f4a7d 100%);
-        }}
-
-        /* --- Barra Lateral (Sidebar) --- */
-        [data-testid="stSidebar"] {{
-            border-right: 2px solid #a1c9f4;
-            background-color: #2d2a4c;
-        }}
-        .sidebar-logo {{
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: 3px solid #a1c9f4;
-            box-shadow: 0 0 15px #a1c9f4;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
-        }}
-
-        /* --- Título principal con efecto Neón --- */
-        h1 {{
-            color: #e6e6fa;
-            text-shadow: 0 0 8px rgba(161, 201, 244, 0.7), 0 0 10px rgba(161, 201, 244, 0.5);
-            text-align: center;
-            padding-top: 2rem;
-        }}
-        
-        /* --- Contenedor del chat con brillo (Solución robusta) --- */
-        .chat-wrapper {{
-            border: 2px solid #4f4a7d;
-            box-shadow: 0 0 20px -5px #a1c9f4; /* El brillo celeste que pediste */
-            border-radius: 20px;
-            background-color: rgba(45, 42, 76, 0.8);
-            padding: 1rem;
-            margin-top: 1rem;
-        }}
-        
-        /* --- Globos de chat --- */
-        [data-testid="stChatMessage"] {{
-            border-radius: 15px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-        }}
-        [data-testid="stChatMessage"][data-testid-stream-message-type="assistant"] {{
-            background-color: #4f4a7d;
-            border: 1px solid #a1c9f4;
-        }}
-        [data-testid="stChatMessage"][data-testid-stream-message-type="user"] {{
-            background-color: #3b3861;
-        }}
-
-        /* --- Input de texto del chat --- */
-        [data-testid="stChatInput"] {{
-            background-color: transparent;
-            border-top: 2px solid #a1c9f4;
-            padding-top: 1rem;
-        }}
-        </style>
-    """, unsafe_allow_html=True)
-    
     # --- Contenido de la App ---
     with st.sidebar:
         st.markdown(f'<img src="{LOGO_URL}" class="sidebar-logo">', unsafe_allow_html=True)
@@ -164,29 +132,29 @@ def main():
             {"role": "assistant", "content": "¡Hola! Soy TecnoBot, el asistente virtual del Instituto 13 de Julio. ¿En qué puedo ayudarte?"}
         ]
 
-    # Envolvemos el área del chat en nuestro div personalizado
+    # Envolvemos el área del chat en nuestro div personalizado para un estilo robusto
     st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
     chat_container = st.container(height=500)
     with chat_container:
         for mensaje in st.session_state.mensajes:
             with st.chat_message(mensaje["role"], avatar="🤖" if mensaje["role"] == "assistant" else "🧑‍💻"):
-                st.markdown(mensaje["content"])
+                st.markdown(mensaje["content"], unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     if prompt_usuario := st.chat_input("Escribe tu pregunta aquí..."):
         st.session_state.mensajes.append({"role": "user", "content": prompt_usuario})
-        
+
         contexto_rag = buscar_contexto_relevante(prompt_usuario, base_de_conocimiento)
         system_prompt_con_contexto = f"{SYSTEM_PROMPT}\n\nCONTEXTO RELEVANTE:\n{contexto_rag}"
-        
+
         historial_para_api = [{"role": "system", "content": system_prompt_con_contexto}]
         mensajes_relevantes = [msg for msg in st.session_state.mensajes if msg['role'] != 'system']
         historial_para_api.extend(mensajes_relevantes[-10:])
-        
+
         respuesta_bot = generar_respuesta_modelo(cliente_groq, modelo_seleccionado, historial_para_api)
         if respuesta_bot:
             st.session_state.mensajes.append({"role": "assistant", "content": respuesta_bot})
-        
+
         st.rerun()
 
 if __name__ == "__main__":
